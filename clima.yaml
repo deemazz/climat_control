@@ -1,0 +1,724 @@
+# ------------------------------------------- #
+# -------------- SUBSTITUTIONS -------------- #
+# ------------------------------------------- #
+
+substitutions:
+  entity:            "climate.test"
+
+  power_off:                 "\U000F0425"
+  thermometer:               "\U000F0510"
+  thermometer_lines:         "\U000F050F"
+  thermometer_celsius:       "\U000F0504"
+
+  radiator_on:               "\U000F0438"
+  radiator_disabled:         "\U000F0AD7"
+  radiator_off:              "\U000F0AD8"
+  
+  activity:                  "\U000F046E"
+  night:                     "\U000F0594" 
+  night2:                    "\U000F0904" 
+  fire:                      "\U000F0238" 
+
+  back:                      "\U000F17B3" 
+
+# ------------------------------------------- #
+# ---------- GLOBALS VARIABLES -------------- #
+# ------------------------------------------- #
+
+
+
+# ------------------------------------------- #
+# ---------------- COLORS ------------------- #
+# ------------------------------------------- #
+
+
+color:
+  - id: color_black
+    hex: 0d0d0d
+  - id: color_dark_gray
+    hex: 333333
+  - id: color_gray
+    hex: 666666
+  - id: color_white
+    hex: f2f0eb
+  - id: color_red
+    hex: ff0000
+  - id: color_light_blue
+    hex: 34c6eb
+
+
+
+# ------------------------------------------- #
+# ------------ ESPHOME OPTIONS -------------- #
+# ------------------------------------------- #
+
+esphome:
+  name: climacontrol
+  friendly_name: ClimaControl
+
+font: !include fonts/round_knob_fonts.yaml
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+safe_mode:
+  boot_is_good_after: 30sec
+
+    
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "1NqudzSIBLzGgrMIxtKWkXZaFeyNgYkp8djlakphpt8="
+
+ota:
+  - platform: esphome
+    password: "8ccdf89753decaa77e657e81dadf5903"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Climacontrol"
+    password: "mypasswd"
+
+captive_portal:
+
+web_server:
+  port: 80
+  version: 3
+
+
+#-------------------------------------------
+# Display  spi
+#-------------------------------------------
+
+# SPI configuration
+spi:
+  id: spi_bus
+  clk_pin: 1
+  mosi_pin: 0
+
+# Configure the display to use LVGL
+display:
+  - platform: ili9xxx
+    model: GC9A01A
+    cs_pin: 10
+    dc_pin: 4
+    reset_pin: 2
+    rotation: 0
+    id: round_display
+    spi_id: spi_bus
+    invert_colors: true
+    # next two lines required for LVGL mode
+    auto_clear_enabled: false
+    update_interval: never
+  
+# Backlight control using LEDC output
+output:
+  - platform: ledc
+    id: backlight_output
+    inverted: True
+    pin: 8
+    frequency: 5000Hz
+
+light:
+  - platform: monochromatic
+    id: backlight
+    name: "Display Backlight"
+    output: backlight_output
+    restore_mode: ALWAYS_ON
+
+# ------------------------------------------- #
+# ----------- TEXT SENSORS ------------------ #
+# ------------------------------------------- #
+
+text_sensor:
+  - platform: homeassistant
+    id: climate_state
+    entity_id: ${entity}
+    attribute: hvac_action
+    name: "State"
+    on_value:
+      - if:
+          condition:
+            lambda: 'return id(climate_state).state == "heating";'
+          then:
+            - logger.log: "!!! climate state on_value - heating"            
+            - lvgl.label.update:
+                id: lbl_heater_icon
+                text_color: color_red
+                text: "${radiator_on}"
+            - lvgl.label.update:
+                id: lbl_heater
+                text_color: color_red
+                text: "обогрев"
+            - lvgl.label.update:
+                id: lbl_target_temp_whole
+                text_color: color_red
+            - lvgl.label.update:
+                id: lbl_target_temp_fract
+                text_color: color_red
+            - lvgl.label.update:
+                id: lbl_mode_off
+                text_color: color_dark_gray
+      - if:
+          condition:
+            lambda: 'return id(climate_state).state == "idle";'
+          then:
+            - logger.log: "!!! climate state on_value - idle"                        
+            - lvgl.label.update:
+                id: lbl_heater_icon
+                text: "${radiator_disabled}"
+                text_color: color_white                  
+            - lvgl.label.update:
+                id: lbl_heater
+                text: "ожидание"
+                text_color: color_white
+            - lvgl.label.update:
+                id: lbl_target_temp_whole
+                text_color: color_white
+            - lvgl.label.update:
+                id: lbl_target_temp_fract
+                text_color: color_white
+            - lvgl.label.update:
+                id: lbl_mode_off
+                text_color: color_dark_gray
+      - if:
+          condition:
+            lambda: 'return id(climate_state).state == "off";'
+          then:
+            - logger.log: "!!! climate state on_value - off"                        
+            - lvgl.label.update:
+                id: lbl_heater_icon
+                text: "${radiator_off}"
+                text_color: color_dark_gray                  
+            - lvgl.label.update:
+                id: lbl_heater
+                text: "выключено"
+                text_color: color_dark_gray
+            - lvgl.label.update:
+                id: lbl_target_temp_whole
+                text_color: color_dark_gray
+            - lvgl.label.update:
+                id: lbl_target_temp_fract
+                text_color: color_dark_gray
+            - lvgl.label.update:
+                id: lbl_mode_off
+                text_color: color_light_blue
+            - lvgl.label.update:
+                id: lbl_mode_activity
+                text_color: color_dark_gray
+            - lvgl.label.update:
+                id: lbl_mode_sleep
+                text_color: color_dark_gray
+            - lvgl.roller.update:
+                id: roller_mode
+                selected_index: 0
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(climate_mode).state == "sleep";'
+                then:
+                  - lvgl.label.update:
+                      id: lbl_mode_activity
+                      text_color: color_dark_gray
+                  - lvgl.label.update:
+                      id: lbl_mode_sleep
+                      text_color: color_red
+                  - lvgl.roller.update:
+                      id: roller_mode
+                      selected_index: 2 
+            - if:
+                condition:
+                  lambda: 'return id(climate_mode).state == "activity";'
+                then:
+                  - lvgl.label.update:
+                      id: lbl_mode_activity
+                      text_color: color_red
+                  - lvgl.label.update:
+                      id: lbl_mode_sleep
+                      text_color: color_dark_gray
+                  - lvgl.roller.update:
+                      id: roller_mode
+                      selected_index: 2 
+
+  - platform: homeassistant
+    id: climate_mode
+    entity_id: ${entity}
+    attribute: preset_mode
+    name: "Mode"
+    on_value:
+      - if:
+          condition:
+            lambda: 'return id(climate_state).state != "off";'
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(climate_mode).state == "sleep";'
+                then:
+                  - logger.log: "!!! climate mode on_value - sleep"
+                  - lvgl.label.update:
+                      id: lbl_mode_off
+                      text_color: color_dark_gray
+                  - lvgl.label.update:
+                      id: lbl_mode_activity
+                      text_color: color_dark_gray
+                  - lvgl.label.update:
+                      id: lbl_mode_sleep
+                      text_color: color_red
+                  - lvgl.roller.update:
+                      id: roller_mode
+                      selected_index: 2
+            - if:
+                condition:
+                  lambda: 'return id(climate_mode).state == "activity";'
+                then:
+                  - logger.log: "!!! climate mode on_value - activity"                  
+                  - lvgl.label.update:
+                      id: lbl_mode_off
+                      text_color: color_dark_gray
+                  - lvgl.label.update:
+                      id: lbl_mode_activity
+                      text_color: color_red
+                  - lvgl.label.update:
+                      id: lbl_mode_sleep
+                      text_color: color_dark_gray
+                  - lvgl.roller.update:
+                      id: roller_mode
+                      selected_index: 1
+            - if:
+                condition:
+                  lambda: 'return id(climate_mode).state == "none";'
+                then:
+                  - logger.log: "!!! climate mode on_value - none"                  
+                  - lvgl.label.update:
+                      id: lbl_mode_activity
+                      text_color: color_dark_gray
+                  - lvgl.label.update:
+                      id: lbl_mode_sleep
+                      text_color: color_dark_gray
+                  - lvgl.roller.update:
+                      id: roller_mode
+                      selected_index: 3
+
+                  
+
+
+# ------------------------------------------- #
+# ---------------- SENSORS ------------------ #
+# ------------------------------------------- #
+
+# Rotary encoder configuration
+sensor:
+  - platform: rotary_encoder
+    id: my_rotary_encoder
+    name: "Rotary Encoder"
+    pin_a: 6
+    pin_b: 7
+    resolution: 2
+    publish_initial_value: true
+    on_clockwise:
+      - if:
+          condition: lvgl.is_paused
+          then: 
+            - logger.log: "LVGL resuming with CW rotary"
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+            - light.turn_on: backlight
+    on_anticlockwise:
+      - if:
+          condition: lvgl.is_paused
+          then: 
+            - logger.log: "LVGL resuming with CCW rotary"
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+            - light.turn_on: backlight
+
+  - platform: homeassistant
+    id: climate_target_temperature
+    entity_id: ${entity}
+    attribute: temperature
+    name: "Target temperature"
+    on_value:
+      - logger.log: "!!! target temperature on_value"
+      - lvgl.label.update:
+          id: lbl_target_temp_whole
+          text: !lambda |-
+            static char buf[10];
+            int whole_part = static_cast<int>(id(climate_target_temperature).state);
+            snprintf(buf, 10, "%d", whole_part);
+            return buf;
+      - lvgl.label.update:
+          id: lbl_target_temp_whole_arc
+          text: !lambda |-
+            static char buf[10];
+            int whole_part = static_cast<int>(id(climate_target_temperature).state);
+            snprintf(buf, 10, "%d", whole_part);
+            return buf;
+      - lvgl.label.update:
+          id: lbl_target_temp_fract
+          text: !lambda |-
+            static char buf[10];
+            int whole_part = static_cast<int>(id(climate_target_temperature).state);
+            int fractional_part = static_cast<int>((id(climate_target_temperature).state - whole_part) * 10);
+            snprintf(buf, 10, ".%01d", fractional_part);
+            return buf;
+      - lvgl.label.update:
+          id: lbl_target_temp_fract_arc
+          text: !lambda |-
+            static char buf[10];
+            int whole_part = static_cast<int>(id(climate_target_temperature).state);
+            int fractional_part = static_cast<int>((id(climate_target_temperature).state - whole_part) * 10);
+            snprintf(buf, 10, ".%01d", fractional_part);
+            return buf;
+      - lvgl.arc.update:
+          id: arc_target_temperature
+          value: !lambda return x;
+
+
+  - platform: homeassistant
+    id: climate_current_temperature
+    entity_id: ${entity}
+    attribute: current_temperature
+    name: "Current temperature"
+    on_value:
+      - lvgl.label.update:
+          id: lbl_current_temp
+          text:
+            format: "%.1f"
+            args: [id(climate_current_temperature).state]   
+
+# -------------------------------------------------- #
+# ---------------- BINARY SENSORS ------------------ #
+# -------------------------------------------------- #
+
+binary_sensor:
+  - platform: gpio
+    id: encoder_button
+    pin: 
+      number: 9
+      inverted: true
+    name: "Rotary Encoder Button"
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_release:
+      - if:
+          condition: lvgl.is_paused
+          then: 
+            - logger.log: "LVGL resuming with button"
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+            - light.turn_on: backlight
+
+button:
+  - platform: restart
+    name: "Restart"
+# ------------------------------------------- #
+# ---------------- LVGL --------------------- #
+# ------------------------------------------- #
+
+# Enable LVGL
+lvgl:
+    encoders:
+      sensor: my_rotary_encoder
+      enter_button: encoder_button
+    pages:
+      - id: room_page
+        bg_color: black
+        widgets:
+          - label:
+              id: lbl_heater_icon
+              align: TOP_MID
+              y: 0
+              text: "${radiator_disabled}"
+              text_color: color_dark_gray
+              text_font: mdi_24
+          - label:
+              id: lbl_heater
+              align: TOP_MID
+              y: 15
+              text: " "
+              text_color: color_dark_gray
+              text_font: nunito_36
+          - button:
+              align: CENTER
+              y: -15
+              width: 180
+              height: 70
+              id: btn_temperature
+              bg_color: color_black
+              border_side: NONE
+              shadow_width: 0
+              widgets:
+              - label:
+                  id: lbl_target_temp_whole
+                  align: RIGHT_MID
+                  x: -50
+                  y: 0
+                  text: "0"
+                  text_color: color_dark_gray
+                  text_font: nunito_84
+                  checkable: true
+              - label:
+                  id: lbl_target_temp_fract
+                  align_to: 
+                    id: lbl_target_temp_whole
+                    align: LEFT_MID
+                    x: 52
+                    y: 15
+                  text: "0"
+                  text_color: color_dark_gray
+                  text_font: nunito_42
+                  checkable: true
+              - label:
+                  id: lbl_target_temp_C
+                  align_to: 
+                    id: lbl_target_temp_whole
+                    align: LEFT_MID
+                    x: 48
+                    y: -18
+                  text_font: nunito_36
+                  text_color: color_dark_gray
+                  text: "°C"
+              on_focus:
+                - logger.log: "!!! btn_temperature on_focus"                                                             
+                - lvgl.page.show:
+                    id: room_page
+              on_click:
+                - logger.log: "!!! btn_temperature on_click"                 
+                - lvgl.page.show:
+                    id: temp_page
+                - lvgl.widget.focus:
+                    id: arc_target_temperature
+                    editing: true
+          - button:
+              align: CENTER
+              y: 45
+              width: 180
+              height: 40
+              id: btn_mode
+              bg_color: color_black
+              border_side: NONE
+              shadow_width: 0
+              widgets:
+              - label:
+                  id: lbl_mode_off
+                  align_to:
+                    id: btn_mode
+                    align: CENTER
+                    x: -50                  
+                  text: "${power_off}"
+                  text_color: color_light_blue
+                  text_font: mdi_24 
+              - label:
+                  id: lbl_mode_sleep
+                  align_to:
+                    id: btn_mode
+                    align: CENTER
+                    x: 0                 
+                  text: "${night}"
+                  text_color: color_dark_gray
+                  text_font: mdi_24
+              - label:
+                  id: lbl_mode_activity
+                  align_to:
+                    id: btn_mode
+                    align: CENTER
+                    x: 50                  
+                  text: "${activity}"
+                  text_color: color_dark_gray
+                  text_font: mdi_24
+              on_focus:
+                - logger.log: "!!! btn_mode on_focus"                 
+                - lvgl.page.show:
+                    id: room_page
+              on_click:
+                - logger.log: "!!! btn_mode on_click"                                   
+                - lvgl.page.show:
+                    id: mode_page
+                - lvgl.widget.focus:
+                    id: roller_mode
+                    editing: true  
+                      
+
+          - label:
+              id: lbl_current_temp_icon
+              align: BOTTOM_MID
+              x: -37
+              y: -10
+              text: "${thermometer}"
+              text_color: color_dark_gray
+              text_font: mdi_24
+          - label:
+              id: lbl_current_temp
+              align: BOTTOM_MID
+              x: 10
+              y: 0
+              text: "0"
+              text_color: color_dark_gray
+              text_font: nunito_36
+      - id: mode_page
+        bg_color: black
+        widgets:
+          - roller:
+              text_font: nunito_36
+              bg_color: color_black
+              align: CENTER
+              mode: INFINITE
+              id: roller_mode
+              width: 240
+              height: 240
+              visible_row_count: 3
+              options:
+                - Выключено
+                - День
+                - Ночь
+                - "<--"
+              on_focus:
+                - logger.log: "!!! Roller on_focus"
+                - lvgl.page.show:
+                    id: mode_page                   
+              on_change:
+                - lvgl.widget.focus:
+                    id: btn_temperature
+                - logger.log: "!!! Roller on_change"              
+                - if:
+                    condition:
+                      lambda: 'return x == 0;'
+                    then:
+                      - logger.log: "!!! Roller on_change - set hvac mode OFF"                       
+                      - homeassistant.action:
+                          action: climate.set_hvac_mode
+                          data:
+                            hvac_mode: "off"
+                            entity_id: ${entity}
+                - if:
+                    condition:
+                      lambda: 'return x == 1;'
+                    then:
+                      - logger.log: "!!! Roller on_change - set hvac mode HEAT"                                             
+                      - homeassistant.action:
+                          action: climate.set_hvac_mode
+                          data:
+                            hvac_mode: "heat"
+                            entity_id: ${entity}
+                      - homeassistant.action:
+                          action: climate.set_preset_mode
+                          data:
+                            preset_mode: "activity"
+                            entity_id: ${entity}
+                - if:
+                    condition:
+                      lambda: 'return x == 2;'
+                    then:
+                      - logger.log: "!!! Roller on_change - set hvac mode SLEEP"                                                                   
+                      - homeassistant.action:
+                          action: climate.set_hvac_mode
+                          data:
+                            hvac_mode: "heat"
+                            entity_id: ${entity}
+                      - homeassistant.action:
+                          action: climate.set_preset_mode
+                          data:
+                            preset_mode: "sleep"
+                            entity_id: ${entity}
+      - id: temp_page
+        bg_color: black     
+        widgets:
+          - label:
+              id: lbl_target_temp_whole_arc
+              align: RIGHT_MID
+              x: -80
+              y: 0
+              text: "0"
+              text_color: color_white
+              text_font: nunito_84
+              checkable: true
+          - label:
+              id: lbl_target_temp_fract_arc
+              align_to: 
+                id: lbl_target_temp_whole_arc
+                align: LEFT_MID
+                x: 52
+                y: 15
+              text: "0"
+              text_color: color_white
+              text_font: nunito_42
+              checkable: true
+          - label:
+              id: lbl_target_temp_C_arc
+              align_to: 
+                id: lbl_target_temp_whole_arc
+                align: LEFT_MID
+                x: 48
+                y: -18
+              text_font: nunito_36
+              text_color: color_white
+              text: "°C"
+          - arc:
+              align: CENTER
+              id: arc_target_temperature
+              value: 20
+              min_value: 20
+              max_value: 30
+              adjustable: true
+              width: 220
+              height: 220
+              indicator:
+                arc_color: color_white
+                arc_width: 8
+              knob:
+                border_color: color_light_blue
+                border_width: 10
+                bg_color: color_red
+              on_focus:
+                - lvgl.page.show:
+                    id: temp_page
+                - logger.log: "!!! Arc on_focus"
+              on_change:
+                - lvgl.label.update:
+                    id: lbl_target_temp_whole_arc
+                    text:
+                      format: "%.0f"
+                      args: [ 'x' ]                  
+                - logger.log: "!!! Arc on_change"    
+              on_release:
+                - lvgl.page.show:
+                    id: room_page
+                - lvgl.widget.focus:
+                    id: btn_temperature
+                - logger.log: "!!! Arc on_release"
+                - homeassistant.service:
+                    service: climate.set_temperature
+                    data:
+                      entity_id: ${entity}
+                      temperature: !lambda return x;
+                - homeassistant.action:
+                    action: climate.set_hvac_mode
+                    data:
+                      hvac_mode: "heat"
+                      entity_id: ${entity}
+
+
+
+    on_idle:
+      - timeout: 60s
+        then:
+          - lvgl.widget.focus:
+              id: btn_temperature
+          - logger.log: "LVGL timeout 60s"
+      - timeout: 120s
+        then:
+          - light.turn_off: backlight
+          - logger.log: "LVGL timeout 120s. Disabling screen"
+          - lvgl.pause:
+    
