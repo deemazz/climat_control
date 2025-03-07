@@ -4,3 +4,6 @@ ESPHome code for 1.28 Inch 240*240 ESP32C3 Round Display with Rotary Knob from V
 My version of using VIEWE display with Home Assistant to control climate in a particular room.
 
 Thanks dmit2k ( https://github.com/dmit2k/viewe-knob-display-esphome/tree/main ).
+
+# For testing purposes made a draft case
+<img width="628" alt="draft case" src="https://github.com/user-attachments/assets/15dfe8d4-635b-45e5-9a7f-d3bcc4dd9a8f" />
