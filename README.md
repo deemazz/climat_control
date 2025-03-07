@@ -5,5 +5,11 @@ My version of using VIEWE display with Home Assistant to control climate in a pa
 
 Thanks dmit2k ( https://github.com/dmit2k/viewe-knob-display-esphome/tree/main ).
 
-# For testing purposes made a draft case
+# Case for testing purposes
+SketchUp model is here in files 
+
 <img width="628" alt="draft case" src="https://github.com/user-attachments/assets/15dfe8d4-635b-45e5-9a7f-d3bcc4dd9a8f" />
+
+
+
+PS This is my first repo, so sorry for the formatting
